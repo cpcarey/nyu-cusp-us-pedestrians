@@ -3,10 +3,10 @@ import numpy as np
 import cv2
 
 BOUNDS = [
-    [80, 0],
+    [60, 0],
     [347, 0],
     [347, 208],
-    [80, 275],
+    [60, 275],
 ]
 
 class Roi:

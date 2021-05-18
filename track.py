@@ -2,6 +2,7 @@ from enum import Enum
 import numpy as np
 import constants
 import cv2
+import util
 from roi import Roi
 
 roi = Roi()
@@ -31,6 +32,17 @@ class Track:
 
     def is_classified(self):
         return self.classification != TrackClassification.NONE
+
+    def is_long(self):
+        if self.start_point == None or self.end_point == None:
+            return False
+
+        vector = (self.end_point[0] - self.start_point[0],
+                  self.end_point[1] - self.start_point[1])
+        magnitude = util.get_magnitude(vector)
+        if len(self.path) > 30 and magnitude > 20:
+            return True
+        return False
 
     def classify(self):
         if self.is_classified():
@@ -75,6 +87,9 @@ class Track:
         return self.classification
 
     def draw(self, frame):
+        if not self.is_long():
+            return
+
         color = (220, 220, 220)
         if self.classification == TrackClassification.INSIDE_ROI:
             color = (0, 0, 220)

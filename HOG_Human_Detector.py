@@ -64,14 +64,9 @@ def extend_track(person):
     match = get_track(person.id)
     match.path.append(person.centroid)
 
-inter_column_matches = []
-
 def mark_track(track):
     if not track.is_classified():
-        if track.classify() == TrackClassification.INSIDE_ROI:
-            inter_column_match = InterColumnMatch(track)
-            inter_column_matches.append(inter_column_match)
-            print(inter_column_match)
+        classification = track.classify()
 
 run = True
 while(True):
@@ -215,8 +210,12 @@ while(True):
         active_tracks.append(track)
         next_id += 1
 
-    for match in inter_column_matches:
-        match.draw(crop)
+    for track in expired_tracks:
+        if track.is_classified():
+            track.draw(crop)
+    for track in active_tracks:
+        if track.is_classified():
+            track.draw(crop)
 
     roi.draw(crop)
 
@@ -239,6 +238,7 @@ while(True):
                 if track:
                     active_tracks.remove(track)
                     expired_tracks.append(track)
+                    track.classify()
 
                 del persons_map[person.id]
                 del no_match_map[person.id]
@@ -251,6 +251,20 @@ while(True):
         break
 
     frame_index += 1
+
+tracks = active_tracks + expired_tracks
+inside_roi_tracks = [t for t in tracks
+                     if t.classification == TrackClassification.INSIDE_ROI]
+outside_roi_tracks = [t for t in tracks
+                      if t.classification == TrackClassification.OUTSIDE_ROI]
+inside_roi_tracks = [t for t in inside_roi_tracks if t.is_long()]
+outside_roi_tracks = [t for t in outside_roi_tracks if t.is_long()]
+
+print('----------------')
+print(f'Total Inside ROI: {len(inside_roi_tracks)}')
+print(f'Total Outside ROI: {len(outside_roi_tracks)}')
+print(f'Total Inside ROI: {[t.person.id for t in inside_roi_tracks]}')
+print(f'Total Outside ROI: {[t.person.id for t in outside_roi_tracks]}')
 
 # When everything done, release the capture
 cap.release()
