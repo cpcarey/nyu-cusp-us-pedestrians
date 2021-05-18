@@ -266,6 +266,9 @@ print(f'Total Outside ROI: {len(outside_roi_tracks)}')
 print(f'Total Inside ROI: {[t.person.id for t in inside_roi_tracks]}')
 print(f'Total Outside ROI: {[t.person.id for t in outside_roi_tracks]}')
 
+print([round(math.degrees(t.get_angle())) for t in inside_roi_tracks])
+print([round(math.degrees(t.get_angle())) for t in outside_roi_tracks])
+
 # When everything done, release the capture
 cap.release()
 # and release the output

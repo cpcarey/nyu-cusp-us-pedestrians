@@ -3,6 +3,7 @@ import numpy as np
 import constants
 import cv2
 import util
+import math
 from roi import Roi
 
 roi = Roi()
@@ -78,7 +79,11 @@ class Track:
                 self.end_point = (end_centroid[0], end_centroid[1], end_time)
 
                 if roi.contains(self.start_point):
-                    self.classification = TrackClassification.INSIDE_ROI
+                    angle = math.degrees(self.get_angle())
+                    if angle <= 45 and angle >= -45:
+                        self.classification = TrackClassification.INSIDE_ROI
+                    else:
+                        self.classification = TrackClassification.OUTSIDE_ROI
                 else:
                     self.classification = TrackClassification.OUTSIDE_ROI
 
@@ -99,3 +104,17 @@ class Track:
                  self.end_point[:2],
                  color=color,
                  thickness=1)
+
+    def get_angle_from_start_point(self, point):
+        if self.start_point is None:
+            return None
+
+        return math.atan2((point[1] - self.start_point[1]),
+                          (point[0] - self.start_point[0]))
+
+    def get_angle(self):
+        if self.start_point is None or self.end_point is None:
+            return None
+
+        return self.get_angle_from_start_point(self.end_point)
+
