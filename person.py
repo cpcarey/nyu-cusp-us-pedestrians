@@ -13,7 +13,7 @@ class Person:
         self.matched_displacement = Displacement((0, 0), (0, 0), 0, 0)
         self.prev_velocities = []
 
-    def draw(self, frame):
+    def draw(self, frame, display_velocity=False):
         cv2.circle(frame, self.centroid, 2, (0, 255, 0), 2)
         # Display the matched ID of the person.
         cv2.putText(frame, str(self.id), util.translate(self.centroid, (5, -5)),
@@ -21,22 +21,24 @@ class Person:
                     fontScale=0.7,
                     color=(0, 255, 0),
                     thickness=2)
-        # Display the rounded mean velocity in px/frame.
-        cv2.putText(frame,
-                    str(util.get_rounded_vector(self.get_velocity_smoothed())),
-                    util.translate(self.centroid, (5, 15)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.5,
-                    color=(0, 255, 255),
-                    thickness=2)
-        # Display the rounded speed in px/frame.
-        cv2.putText(frame,
-                    str(round(util.get_magnitude(self.get_velocity_smoothed()))),
-                    util.translate(self.centroid, (5, 40)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.6,
-                    color=(0, 9, 255),
-                    thickness=2)
+
+        if display_velocity:
+            # Display the rounded mean velocity in px/frame.
+            cv2.putText(frame,
+                        str(util.get_rounded_vector(self.get_velocity_smoothed())),
+                        util.translate(self.centroid, (5, 15)),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.5,
+                        color=(0, 255, 255),
+                        thickness=2)
+            # Display the rounded speed in px/frame.
+            cv2.putText(frame,
+                        str(round(util.get_magnitude(self.get_velocity_smoothed()))),
+                        util.translate(self.centroid, (5, 40)),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.6,
+                        color=(0, 9, 255),
+                        thickness=2)
 
     def append_velocity(self):
         """Updates this persons velocity buffer with its current velocity while

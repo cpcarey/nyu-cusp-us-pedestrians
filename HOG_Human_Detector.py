@@ -10,12 +10,12 @@
 import numpy as np
 import cv2
 import math
-import matplotlib.path as mpl_path
 import constants
 
 from person import Person
-from roi_match import RoiMatch
+from track import Track, TrackClassification
 from inter_column_match import InterColumnMatch
+from roi import Roi
 
 # initialize the HOG descriptor/person detector
 hog = cv2.HOGDescriptor()
@@ -50,74 +50,28 @@ CROP_TOP = 0
 CROP_BOTTOM = 350
 PERSON_HEIGHT_MAX = 250
 
-roi = [
-    [80, 0],
-    [347, 0],
-    [347, 208],
-    [80, 275],
-]
-roi_bounds = mpl_path.Path(np.array(roi))
-roi_matches_in = []
-roi_matches_out = []
+active_tracks = []
+expired_tracks = []
+roi = Roi()
 
-
-def is_person_id_in_roi(id):
-    for match in roi_matches_in:
-        if id == match.person.id:
-            return True
-    return False
-
-def get_roi_match(id):
-    for match in roi_matches_in:
+def get_track(id, tracks):
+    for match in tracks:
         if id == match.person.id:
             return match
     return None
 
-def extend_roi_match(person):
-    match = get_roi_match(person.id)
+def extend_track(person):
+    match = get_track(person.id)
     match.path.append(person.centroid)
 
 inter_column_matches = []
 
-def mark_roi_matches():
-    for roi_match in roi_matches_in:
-        if len(roi_match.path) < constants.ROI_MATCH_PATH_THRESHOLD:
-            continue
-
-        if not roi_match.marked:
-            N = 5
-            path_start = roi_match.path[0:N]
-            start_centroid = (int(round(np.sum([p[0] for p in path_start]) / N)),
-                              int(round(np.sum([p[1] for p in path_start]) / N)))
-
-            start_time = roi_match.times[0]
-            end_centroid = roi_match.path[1]
-            end_time = roi_match.times[1]
-            entered = False
-            splice_index = -1
-
-            for index, time in enumerate(roi_match.times):
-                if (time - start_time >= constants.ROI_MATCH_TIME_THRESHOLD and
-                    index >= constants.ROI_MATCH_PATH_THRESHOLD):
-                    entered = True
-                    end_time = time
-
-                    path_end = roi_match.path[index + 1 - N: index + 1]
-                    end_centroid = (int(round(np.sum([p[0] for p in path_end]) / N)),
-                                    int(round(np.sum([p[1] for p in path_end]) / N)))
-
-                    splice_index = index
-                    break
-
-            if entered:
-                roi_match.marked = True
-                inter_column_match = InterColumnMatch(roi_match,
-                                                      start_centroid,
-                                                      end_centroid,
-                                                      start_time,
-                                                      end_time)
-                inter_column_matches.append(inter_column_match)
-                print(inter_column_match)
+def mark_track(track):
+    if not track.is_classified():
+        if track.classify() == TrackClassification.INSIDE_ROI:
+            inter_column_match = InterColumnMatch(track)
+            inter_column_matches.append(inter_column_match)
+            print(inter_column_match)
 
 run = True
 while(True):
@@ -235,12 +189,9 @@ while(True):
                 matched_persons.append(matched_person)
                 del unmatched_persons_map[unmatched_person_id]
 
-                if is_person_id_in_roi(matched_person.id):
-                    roi_match = get_roi_match(matched_person.id)
-                    if roi_bounds.contains_point(matched_person.centroid):
-                        roi_match.extend(matched_person, frame_index)
-                    elif not roi_match.locked:
-                        roi_match.lock()
+                track = get_track(matched_person.id, active_tracks)
+                if track:
+                    track.extend(matched_person, frame_index)
 
             # Remove previous person used from future use in this iteration.
             for index, displacements in enumerate(displacement_matrix):
@@ -251,7 +202,8 @@ while(True):
 
     all_persons = matched_persons
     ids = [p.id for p in all_persons]
-    mark_roi_matches()
+    for track in active_tracks:
+        mark_track(track)
 
     # Maintain a dictionary of how many frames an unmatched person has gone
     # unmatched.
@@ -259,24 +211,14 @@ while(True):
         person.id = next_id
         persons_map[person.id] = person
         all_persons.append(person)
-        if roi_bounds.contains_point(person.centroid):
-            roi_match = RoiMatch(person, frame_index)
-            roi_matches_in.append(roi_match)
+        track = Track(person, frame_index)
+        active_tracks.append(track)
         next_id += 1
 
     for match in inter_column_matches:
-        cv2.line(crop,
-                 match.start_position,
-                 match.end_position,
-                 color=(220, 220, 220),
-                 thickness=1)
+        match.draw(crop)
 
-    points = np.array(roi, np.int32).reshape((-1, 1, 2))
-    cv2.polylines(crop,
-                  [points],
-                  isClosed=True,
-                  color=(255, 0, 255),
-                  thickness=2)
+    roi.draw(crop)
 
     for person in all_persons:
         person.draw(crop)
@@ -293,6 +235,11 @@ while(True):
             no_match_map[person.id] += 1
 
             if no_match_map[person.id] > constants.NO_MATCH_FRAME_THRESHOLD:
+                track = get_track(person.id, active_tracks)
+                if track:
+                    active_tracks.remove(track)
+                    expired_tracks.append(track)
+
                 del persons_map[person.id]
                 del no_match_map[person.id]
 
